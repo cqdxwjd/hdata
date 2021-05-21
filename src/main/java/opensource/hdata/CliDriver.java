@@ -16,15 +16,18 @@ import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class CliDriver {
 
     private static final String XML_FILE = "f";
     private static final String HDATA_VARS = "var";
+    private static final Logger LOG = LogManager.getLogger(CliDriver.class);
 
     /**
      * 创建命令行选项
-     * 
+     *
      * @return
      */
     public Options createOptions() {
@@ -40,7 +43,7 @@ public class CliDriver {
 
     /**
      * 打印命令行帮助信息
-     * 
+     *
      * @param options
      */
     public void printHelp(Options options) {
@@ -50,7 +53,7 @@ public class CliDriver {
 
     /**
      * 替换命令行变量
-     * 
+     *
      * @param config
      * @param vars
      */
@@ -69,10 +72,13 @@ public class CliDriver {
 
     /**
      * 主程序入口
-     * 
+     *
      * @param args
      */
     public static void main(String[] args) {
+        // 开发测试时添加
+        args = new String[]{"-f", "job-examples/jdbc-jdbc.xml"};
+
         CliDriver cliDriver = new CliDriver();
         Options options = cliDriver.createOptions();
         if (args.length < 1) {
