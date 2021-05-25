@@ -43,6 +43,7 @@ public class RecordWorkHandler implements WorkHandler<RecordEvent> {
                     }
                 }
 
+                System.out.println(event.getRecord());
                 writer.execute(event.getRecord());
                 metric.getWriteCount().incrementAndGet();
             } catch (Exception e) {

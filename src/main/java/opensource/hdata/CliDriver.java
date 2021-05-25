@@ -77,7 +77,9 @@ public class CliDriver {
      */
     public static void main(String[] args) {
         // 开发测试时添加
-        args = new String[]{"-f", "job-examples/jdbc-jdbc.xml"};
+//        args = new String[]{"-f", "job-examples/jdbc-jdbc.xml"};
+        args = new String[]{"-f", "job-examples/jdbc-hive.xml"};
+        System.setProperty("hdata.conf.dir", "conf");
 
         CliDriver cliDriver = new CliDriver();
         Options options = cliDriver.createOptions();

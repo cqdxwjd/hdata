@@ -2,25 +2,27 @@
 
 <job id="">
     <reader name="jdbc">
-		<driver>org.postgresql.Driver</driver>
-		<url>jdbc:postgresql://localhost:5432/ip</url>
-		<username>postgres</username>
-		<password>toor</password>
-		<table>ip_address</table>
-		<columns></columns>
-		<excludeColumns></excludeColumns>
-		<sql></sql>
-		<where></where>
-		<splitBy></splitBy>
-		<parallelism>3</parallelism>
-	</reader>
+        <driver>com.mysql.jdbc.Driver</driver>
+        <url>jdbc:mysql://localhost:3306/test?useSSL=false</url>
+        <username>root</username>
+        <password>shuihuo</password>
+        <table>student</table>
+        <columns></columns>
+        <excludeColumns></excludeColumns>
+        <sql></sql>
+        <where></where>
+        <splitBy></splitBy>
+        <parallelism>1</parallelism>
+    </reader>
 
-	<writer name="hive">
-		<metastoreUris>thrift://192.168.142.21:9083</metastoreUris>
-		<database>default</database>
-		<table>tmp_hdata_rcfile_test_p</table>
-		<partitions>p=20140407</partitions>
-		<hadoopUser>bigdata</hadoopUser>
-		<parallelism>3</parallelism>
-	</writer>
+    <writer name="hive">
+        <metastoreUris>thrift://172.30.1.233:9083</metastoreUris>
+        <database>hdata</database>
+<!--        <table>student_without_patition</table>-->
+        <table>student</table>
+        <partitions>pdate=2021-05-21</partitions>
+<!--        <partitions></partitions>-->
+        <hadoopUser>admin</hadoopUser>
+        <parallelism>1</parallelism>
+    </writer>
 </job>

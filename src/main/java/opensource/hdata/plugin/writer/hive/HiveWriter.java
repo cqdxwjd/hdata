@@ -35,6 +35,7 @@ import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.serde2.Serializer;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
@@ -44,6 +45,8 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
+import javax.mail.Session;
 
 @SuppressWarnings("deprecation")
 public class HiveWriter extends Writer {
@@ -58,6 +61,7 @@ public class HiveWriter extends Writer {
     private PluginConfig writerConfig;
     private Object hiveRecord;
     private String hdfsTmpDir;
+    private JobContext context;
 
     private static Class<?> hiveRecordWritale;
     private static List<Field> classFields = new ArrayList<Field>();
@@ -93,6 +97,7 @@ public class HiveWriter extends Writer {
     public void prepare(JobContext context, PluginConfig writerConfig) {
         hdfsTmpDir = context.getEngineConfig().getString("hdata.hive.writer.tmp.dir", "/tmp");
         this.writerConfig = writerConfig;
+        this.context = context;
         String metastoreUris = writerConfig.getString(HiveWriterProperties.METASTORE_URIS);
         String dbName = writerConfig.getString(HiveWriterProperties.DATABASE, "default");
         String tableName = writerConfig.getString(HiveWriterProperties.TABLE);
@@ -102,11 +107,20 @@ public class HiveWriter extends Writer {
 
         HiveConf conf = new HiveConf();
         conf.set(ConfVars.METASTOREURIS.varname, metastoreUris);
+        conf.set(ConfVars.METASTORE_CONNECTION_USER_NAME.varname, context.getEngineConfig().getString("javax.jdo.option.ConnectionUserName"));
+        conf.set(ConfVars.METASTOREPWD.varname, context.getEngineConfig().getString("javax.jdo.option.ConnectionPassword"));
+        conf.set(ConfVars.METASTORECONNECTURLKEY.varname, context.getEngineConfig().getString("javax.jdo.option.ConnectionURL"));
+        conf.set(ConfVars.METASTORE_CONNECTION_DRIVER.varname, context.getEngineConfig().getString("javax.jdo.option.ConnectionDriverName"));
+        SessionState state = new SessionState(conf);
+        SessionState.start(state);
 
         Hive hive;
         Table table;
         try {
-            hive = Hive.get(conf, true);
+//            hive = Hive.get(conf, true);
+            hive = Hive.get(conf);
+            List<String> allDatabases = hive.getAllDatabases();
+            System.out.println(allDatabases);
             table = hive.getTable(dbName, tableName, false);
 
             partitionKeySize = table.getPartitionKeys().size();
@@ -135,10 +149,11 @@ public class HiveWriter extends Writer {
                 files.add(path);
             }
 
-            inspector = (StructObjectInspector) ObjectInspectorFactory.getReflectionObjectInspector(HiveRecordWritable.class,
+            inspector = (StructObjectInspector) ObjectInspectorFactory.getReflectionObjectInspector(hiveRecordWritale,
                     ObjectInspectorFactory.ObjectInspectorOptions.JAVA);
+            System.out.println(inspector.getAllStructFieldRefs());
             JobConf jobConf = new JobConf();
-            writer = outputFormat.getHiveRecordWriter(jobConf, path, HiveRecordWritable.class, isCompress, table.getMetadata(), Reporter.NULL);
+            writer = outputFormat.getHiveRecordWriter(jobConf, path, HiveRecordWritable.class, false, table.getMetadata(), Reporter.NULL);
         } catch (Exception e) {
             throw new HDataException(e);
         } finally {
@@ -149,9 +164,10 @@ public class HiveWriter extends Writer {
     @Override
     public void execute(Record record) {
         try {
-            for (int i = 0, len = record.getFieldsCount() - partitionKeySize; i < len; i++) {
+            for (int i = 0, len = record.getFieldsCount(); i < len; i++) {
                 classFields.get(i).set(hiveRecord, TypeConvertUtils.convert(record.getField(i), classFields.get(i).getType()));
             }
+            System.out.println(serializer);
             writer.write(serializer.serialize(hiveRecord, inspector));
         } catch (Exception e) {
             throw new HDataException(e);
@@ -182,21 +198,29 @@ public class HiveWriter extends Writer {
                 String tableName = writerConfig.getString(HiveWriterProperties.TABLE);
                 HiveConf conf = new HiveConf();
                 conf.set(ConfVars.METASTOREURIS.varname, metastoreUris);
+                conf.set(ConfVars.METASTORE_CONNECTION_USER_NAME.varname, context.getEngineConfig().getString("javax.jdo.option.ConnectionUserName"));
+                conf.set(ConfVars.METASTOREPWD.varname, context.getEngineConfig().getString("javax.jdo.option.ConnectionPassword"));
+                conf.set(ConfVars.METASTORECONNECTURLKEY.varname, context.getEngineConfig().getString("javax.jdo.option.ConnectionURL"));
+                conf.set(ConfVars.METASTORE_CONNECTION_DRIVER.varname, context.getEngineConfig().getString("javax.jdo.option.ConnectionDriverName"));
                 Path renamedPath = new Path(path.toString().replaceFirst("\\.tmp$", ""));
                 FileSystem fs = renamedPath.getFileSystem(conf);
                 fs.rename(path, renamedPath);
+                SessionState state = new SessionState(conf);
+                SessionState.start(state);
 
                 Hive hive;
                 try {
-                    hive = Hive.get(conf, true);
+//                    hive = Hive.get(conf, true);
+                    hive = Hive.get(conf);
                     if (partitionKeySize == 0) {
                         LOG.info("Loading data {} into table {}.{}", renamedPath.toString(), dbName, tableName);
-                        hive.loadTable(renamedPath, dbName + "." + tableName, false, false);
+                        hive.loadTable(renamedPath, dbName + "." + tableName, false, false, false, false, false);
                     } else {
                         Table table = hive.getTable(dbName, tableName, false);
                         Partition p = createPartition(hive, table, partitionSpecify);
                         LOG.info("Loading data {} into table {}.{} partition({})", renamedPath.toString(), dbName, tableName, p.getName());
-                        hive.loadPartition(renamedPath, dbName + "." + tableName, partitionSpecify, false, false, true, false);
+//                        hive.loadPartition(renamedPath, dbName + "." + tableName, partitionSpecify, false, false, true, false, false, false);
+                        hive.loadPartition(renamedPath, table, partitionSpecify, true, false, false, false, false, false);
                     }
                 } catch (Exception e) {
                     throw new HDataException(e);
