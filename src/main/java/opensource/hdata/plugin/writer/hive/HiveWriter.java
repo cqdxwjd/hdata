@@ -153,7 +153,7 @@ public class HiveWriter extends Writer {
                     ObjectInspectorFactory.ObjectInspectorOptions.JAVA);
             System.out.println(inspector.getAllStructFieldRefs());
             JobConf jobConf = new JobConf();
-            writer = outputFormat.getHiveRecordWriter(jobConf, path, HiveRecordWritable.class, false, table.getMetadata(), Reporter.NULL);
+            writer = outputFormat.getHiveRecordWriter(jobConf, path, HiveRecordWritable.class, isCompress, table.getMetadata(), Reporter.NULL);
         } catch (Exception e) {
             throw new HDataException(e);
         } finally {
@@ -214,7 +214,7 @@ public class HiveWriter extends Writer {
                     hive = Hive.get(conf);
                     if (partitionKeySize == 0) {
                         LOG.info("Loading data {} into table {}.{}", renamedPath.toString(), dbName, tableName);
-                        hive.loadTable(renamedPath, dbName + "." + tableName, false, false, false, false, false);
+                        hive.loadTable(renamedPath, dbName + "." + tableName, true, false, false, false, false);
                     } else {
                         Table table = hive.getTable(dbName, tableName, false);
                         Partition p = createPartition(hive, table, partitionSpecify);
